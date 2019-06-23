@@ -79,6 +79,8 @@ struct m2s_sysreg {
 #define M2S_SYSREG			((volatile struct m2s_sysreg *)\
 					(M2S_SYSREG_BASE))
 
+#define SYSREG_FPGA_SOFTRESET_MASK	(1 << 16)
+
 struct m2s_coresf2config {
     unsigned int   config_done;
     unsigned int   init_done;
@@ -89,6 +91,10 @@ struct m2s_coresf2config {
 #define CORE_SF2_CFG			\
 	((volatile struct m2s_coresf2config *)CORE_SF2_CFG_BASE)
 
+#define CONFIG_1_DONE			(1 << 0)
+#define CONFIG_2_DONE			(1 << 1)
+#define INIT_DONE_MASK			(1 << 0)
+
 /*
  * Reference clocks enumeration
  */
@@ -98,12 +104,14 @@ enum clock {
 	CLOCK_DDR,
 	CLOCK_PCLK0,
 	CLOCK_PCLK1,
-	CLOCK_FPGA,
+	CLOCK_FIC0,
+	CLOCK_FIC1,
+	CLOCK_DDRFIC,
 	CLOCK_END
 };
 
 /*
- * Return a clock value for the specified refernce clock
+ * Return a clock value for the specified reference clock
  * @param clck		reference clock
  * @returns		clock value
  */

@@ -27,11 +27,15 @@
 #include <common.h>
 #include <netdev.h>
 #include <asm/arch/ddr.h>
+#include <asm/arch/m2s.h>
+#include <configs/m2s-fg484-som.h>
 
 /*
  * Generate DDR timings depending on the following DDR clock
  */
-#define M2S_DDR_MHZ		(CONFIG_SYS_M2S_SYSREF / (1000 * 1000))
+#define M2S_DDR_MULTIPLIER	2
+#define M2S_DDR_MHZ			(M2S_DDR_MULTIPLIER * \
+							(CONFIG_SYS_M2S_SYSREF / (1000 * 1000)))
 
 /*
  * Common conversion macros used for DDR cfg
@@ -87,7 +91,35 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
-	return 0;
+    return 0;
+}
+
+int init_done(void)
+{
+    /* Adapted from CMSIS/system_m2sxxx.c : SystemInit() function...
+     * --------------------------------------------------------------------------
+     * Synchronize with CoreSF2Reset controlling resets from the fabric.
+     */
+
+    /*
+     * Negate FPGA_SOFTRESET to de-assert MSS_RESET_N_M2F in the fabric. We must
+     * do this here because this signal is only deasserted by the System
+     * Controller on a power-on reset. Other types of reset such as a watchdog
+     * reset would result in the FPGA fabric being held in reset and getting
+     * stuck waiting for the CoreSF2Config INIT_DONE to become asserted.
+     */
+    M2S_SYSREG->soft_reset_cr &= ~SYSREG_FPGA_SOFTRESET_MASK;
+
+    /*
+     * Signal to CoreSF2Reset that peripheral configuration registers have been
+     * written.
+     */
+    CORE_SF2_CFG->config_done |= (CONFIG_1_DONE | CONFIG_2_DONE);
+
+    /* Wait for INIT_DONE from CoreSF2Reset. */
+    while (!(CORE_SF2_CFG->init_done & INIT_DONE_MASK));
+
+    return 0;
 }
 
 int checkboard(void)
@@ -107,9 +139,10 @@ int dram_init (void)
 	u16				val;
 
 	/*
-	 * Enable access to MDDR regs
+	 * Enable access to MDDR regs.
+	 * Read-modify-write is important here!
 	 */
-	M2S_SYSREG->mddr_cr = (1 << 0);
+	M2S_SYSREG->mddr_cr |= (1 << 0);
 
 	/*
 	 * No non-bufferable regions

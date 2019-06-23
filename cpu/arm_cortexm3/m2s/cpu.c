@@ -32,11 +32,14 @@ int print_cpuinfo(void)
 	printf("CPU  : %s\n", "SmartFusion2 SoC (Cortex-M3 Hard IP)");
 
 	strmhz(buf[CLOCK_SYSTICK], clock_get(CLOCK_SYSTICK));
-	strmhz(buf[CLOCK_DDR], clock_get(CLOCK_DDR));
-	strmhz(buf[CLOCK_PCLK0], clock_get(CLOCK_PCLK0));
-	strmhz(buf[CLOCK_PCLK1], clock_get(CLOCK_PCLK1));
-	printf("Freqs: CORTEX-M3=%sMHz,PCLK0=%sMHz,PCLK1=%sMHz\n",
-		buf[CLOCK_SYSTICK], buf[CLOCK_PCLK0], buf[CLOCK_PCLK1]);
+	strmhz(buf[CLOCK_DDR],     clock_get(CLOCK_DDR));
+	strmhz(buf[CLOCK_PCLK0],   clock_get(CLOCK_PCLK0));
+	strmhz(buf[CLOCK_PCLK1],   clock_get(CLOCK_PCLK1));
+	strmhz(buf[CLOCK_FIC0],    clock_get(CLOCK_FIC0));
+	strmhz(buf[CLOCK_DDRFIC],  clock_get(CLOCK_DDRFIC));
+	printf("Freqs: CORTEX-M3=%sMHz,DDR=%sMHz,PCLK0=%sMHz,PCLK1=%sMHz,FIC0=%sMHz,DDRFIC=%sMHz\n",
+		buf[CLOCK_SYSTICK], buf[CLOCK_DDR], buf[CLOCK_PCLK0],
+		buf[CLOCK_PCLK1], buf[CLOCK_FIC0], buf[CLOCK_DDRFIC]);
 
 	return 0;
 }

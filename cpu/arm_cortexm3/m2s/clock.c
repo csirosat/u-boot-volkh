@@ -113,16 +113,20 @@ static void clock_mss_learn(void)
 	/*
 	 * Respectively:
 	 * M3_CLK_DIVISOR
-	 * DDR
+	 * FACC_PLL_DIVQ & FACC_PLL_DIVR
 	 * APB0_DIVISOR
 	 * APB1_DIVISOR
-	 * FIC32_0_DIVISOR
+	 * FIC_0_DIVISOR
+	 * FIC_1_DIVISOR
+	 * DDR_FIC_DIVISOR
 	 */
-	clock[CLOCK_SYSTICK] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 9);
-	clock[CLOCK_DDR] = clock[CLOCK_SYSREF] / clock_mss_divisor(r2, 16);
-	clock[CLOCK_PCLK0] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 2);
-	clock[CLOCK_PCLK1] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 5);
-	clock[CLOCK_FPGA] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 13);
+	clock[CLOCK_SYSTICK] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  9);
+	clock[CLOCK_DDR]     = clock[CLOCK_SYSREF] / ((r2 & 0x3F) + 1) * clock_mss_divisor(r2, 16);
+	clock[CLOCK_PCLK0]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  2);
+	clock[CLOCK_PCLK1]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  5);
+	clock[CLOCK_FIC0]    = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 13);
+	clock[CLOCK_FIC1]    = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 16);
+	clock[CLOCK_DDRFIC]  = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 19);
 }
 
 /*

@@ -273,6 +273,7 @@ init_fnc_t *init_sequence[] = {
 	arm_pci_init,
 #endif
 	display_dram_config,
+	init_done,
 	NULL,
 };
 
