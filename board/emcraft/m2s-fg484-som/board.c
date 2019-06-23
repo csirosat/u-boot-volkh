@@ -59,27 +59,27 @@
 /*
  * MT46H32M16LFBF-6 params & timings
  */
-#define DDR_BL			8	/* Burst length (value)		*/
-#define DDR_MR_BL		3	/* Burst length (power of 2)	*/
+#define DDR_BL			16	/* Burst length (value)		*/
+#define DDR_MR_BL		4	/* Burst length (power of 2)	*/
 #define DDR_BT			0	/* Burst type int(1)/seq(0)	*/
 
 #define DDR_CL			3	/* CAS (read) latency		*/
 #define DDR_WL			1	/* Write latency		*/
 #define DDR_tMRD		2
 #define DDR_tWTR		2
-#define DDR_tXP			1
+#define DDR_tXP			2
 #define DDR_tCKE		1
 
 #define DDR_tRFC		M2S_CLK_MIN(72)
 #define DDR_tREFI		M2S_CLK32_MAX(7800)
 #define DDR_tCKE_pre		M2S_CLK1024_MIN(200000)
 #define DDR_tCKE_post		M2S_CLK1024_MIN(400)
-#define DDR_tRCD		M2S_CLK_MIN(18)
-#define DDR_tRRD		M2S_CLK_MIN(12)
-#define DDR_tRP			M2S_CLK_MIN(18)
-#define DDR_tRC			M2S_CLK_MIN(60)
+#define DDR_tRCD		M2S_CLK_MIN(15)
+#define DDR_tRRD		M2S_CLK_MIN(10)
+#define DDR_tRP			M2S_CLK_MIN(15)
+#define DDR_tRC			M2S_CLK_MIN(55)
 #define DDR_tRAS_max		M2S_CLK1024_MAX(70000)
-#define DDR_tRAS_min		M2S_CLK_MIN(42)
+#define DDR_tRAS_min		M2S_CLK_MIN(40)
 #define DDR_tWR			M2S_CLK_MIN(15)
 
 /*
@@ -149,7 +149,7 @@ int dram_init (void)
 	 */
 	M2S_SYSREG->ddrb_nb_size_cr = 0;
 
-#if (DDR_BL == 16)
+#if 0 //(DDR_BL == 16)
 	/*
 	 * Disable all DDR Bridge buffers
 	 * We suspect some bug in the buffering scheme, so disable
@@ -175,7 +175,12 @@ int dram_init (void)
 	ddr->ddrc.ADDR_MAP_COL_2_CR = 0xFFFF;
 	ddr->ddrc.ADDR_MAP_COL_3_CR = 0x3300;
 	ddr->ddrc.ADDR_MAP_ROW_1_CR = 0x7777;
-	ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x0FFF;
+	//ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x0FFF;
+	/*
+	 * Configure for 128MB memory although only
+	 * 64MB will be used directly by U-boot & Linux
+	 */
+	ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x07FF;
 
 	/*
 	 * Setup timings
