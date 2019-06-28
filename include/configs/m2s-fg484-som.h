@@ -263,21 +263,27 @@
  * Enable all those monitor commands that are needed
  */
 #include <config_cmd_default.h>
-#undef CONFIG_CMD_BOOTD
-#undef CONFIG_CMD_CONSOLE
-#undef CONFIG_CMD_ECHO
-#undef CONFIG_CMD_EDITENV
-#undef CONFIG_CMD_FPGA
-#undef CONFIG_CMD_IMI
-#undef CONFIG_CMD_ITEST
+#define CONFIG_CMD_BOOTD
+#define CONFIG_CMD_CONSOLE
+#define CONFIG_CMD_ECHO
+#define CONFIG_CMD_EDITENV
+#define CONFIG_CMD_FPGA
+#define CONFIG_CMD_IMI
+#define CONFIG_CMD_ITEST
+
+// u-boot/common/cmd_bootm.c generates build errors
 #undef CONFIG_CMD_IMLS
+
 #define CONFIG_CMD_LOADS
-#undef CONFIG_CMD_MISC
+#define CONFIG_CMD_MISC
 #define CONFIG_CMD_NET
-#undef CONFIG_CMD_NFS
-#undef CONFIG_CMD_SOURCE
-#undef CONFIG_CMD_XIMG
+#define CONFIG_CMD_NFS
+#define CONFIG_CMD_SOURCE
+#define CONFIG_CMD_XIMG
+
+// u-boot/cpu/arm_cortexm3/cmd_somtest.c does not exist
 #undef CONFIG_CMD_SOMTEST
+
 #if defined(CONFIG_SPI_FLASH)
 #define CONFIG_CMD_SF
 #endif
