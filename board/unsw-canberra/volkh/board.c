@@ -1,7 +1,15 @@
 /*
- * board/emcraft/m2s-som/board.c
+ * board/unsw-canberra/volkh/board.c
  *
- * Board specific code the the Emcraft SmartFusion2 system-on-module (SOM).
+ * (C) Copyright 2019 CSIRO
+ * Commonwealth Scientific and Industrial Research Organisation
+ * Mike Pilawa <Mike.Pilawa@csiro.au>
+ *
+ * Board specific code for the UNSW-Canberra Volkh
+ * SmartFusion2-based flight computer module.
+ *
+ * Code below adapted from Emcraft SmartFusion2 M2S_FG484_SOM
+ * board/emcraft/m2s-fg484-som/board.c which is...
  *
  * (C) Copyright 2012, 2013
  * Emcraft Systems, <www.emcraft.com>
@@ -28,7 +36,7 @@
 #include <netdev.h>
 #include <asm/arch/ddr.h>
 #include <asm/arch/m2s.h>
-#include <configs/m2s-fg484-som.h>
+#include <configs/volkh.h>
 
 /*
  * Generate DDR timings depending on the following DDR clock
@@ -175,7 +183,12 @@ int dram_init (void)
 	ddr->ddrc.ADDR_MAP_COL_2_CR = 0xFFFF;
 	ddr->ddrc.ADDR_MAP_COL_3_CR = 0x3300;
 	ddr->ddrc.ADDR_MAP_ROW_1_CR = 0x7777;
-	ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x0FFF;
+	//ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x0FFF;
+	/*
+	 * Configure for 128MB memory although only
+	 * 64MB will be used directly by U-boot & Linux
+	 */
+	ddr->ddrc.ADDR_MAP_ROW_2_CR = 0x07FF;
 
 	/*
 	 * Setup timings

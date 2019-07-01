@@ -3320,6 +3320,9 @@ sf2plus_config :  unconfig
 m2s-som-copy2_config :  unconfig
 	@$(MKCONFIG) $(@:_config=) arm arm_cortexm3 m2s-som emcraft m2s
 
+volkh_config :  unconfig
+	@$(MKCONFIG) $(@:_config=) arm arm_cortexm3 volkh unsw-canberra m2s
+
 #########################################################################
 ## XScale Systems
 #########################################################################
