@@ -273,7 +273,9 @@ init_fnc_t *init_sequence[] = {
 	arm_pci_init,
 #endif
 	display_dram_config,
+#if defined(CONFIG_SYS_M2S)
 	init_done,
+#endif
 	NULL,
 };
 
