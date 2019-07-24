@@ -74,7 +74,7 @@
 /*
  * Monitor prompt
  */
-#define CONFIG_SYS_PROMPT		"VOLKH> "
+#define CONFIG_SYS_PROMPT		"M2S-VOLKH> "
 
 /*
  * We want to call the CPU specific initialization
@@ -304,7 +304,7 @@
  */
 #define CONFIG_BOOTDELAY		3
 #define CONFIG_ZERO_BOOTDELAY_CHECK
-#define CONFIG_HOSTNAME			volkh
+#define CONFIG_HOSTNAME			m2s-volkh
 #define CONFIG_BOOTARGS			"m2s_platform=m2s-volkh "\
 					"console=ttyS0,115200 panic=10"
 #define CONFIG_BOOTCOMMAND		"run flashboot"

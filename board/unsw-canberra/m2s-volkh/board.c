@@ -36,7 +36,7 @@
 #include <netdev.h>
 #include <asm/arch/ddr.h>
 #include <asm/arch/m2s.h>
-#include <configs/volkh.h>
+#include <configs/m2s-volkh.h>
 
 /*
  * Generate DDR timings depending on the following DDR clock
