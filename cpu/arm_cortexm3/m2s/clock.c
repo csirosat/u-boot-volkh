@@ -107,13 +107,20 @@ static void clock_mss_learn(void)
 	 * This clock comes from the FPGA PLL and we can't determine
 	 * its value at run time. All clocks derived from CLK_BASE
 	 * can be calculated at run time (and we do just that).
+	 *
+	 * NOTE: CLOCK_DDR calculation requires a mysterious factor of 8
+	 * unaccounted for in all presently known registers.  Suspected to
+	 * be internal to the MPLL, and quite possibly opaque to the user.
+	 * Furthermore, the factor of 8 is not required in all clock configs.
+	 * Trying to get more information out of Microsemi on this, however
+	 * currently looking to be a long-shot.  So this remains a hack for now.
 	 */
 	clock[CLOCK_SYSREF] = CONFIG_SYS_M2S_SYSREF;
 
 	/*
 	 * Respectively:
 	 * M3_CLK_DIVISOR
-	 * FACC_PLL_DIVQ & FACC_PLL_DIVR
+	 * FACC_PLL_DIVR & FACC_PLL_DIVF & FACC_PLL_DIVQ
 	 * APB0_DIVISOR
 	 * APB1_DIVISOR
 	 * FIC_0_DIVISOR
@@ -121,7 +128,7 @@ static void clock_mss_learn(void)
 	 * DDR_FIC_DIVISOR
 	 */
 	clock[CLOCK_SYSTICK] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  9);
-	clock[CLOCK_DDR]     = clock[CLOCK_SYSREF] / ((r2 & 0x3F) + 1) *
+	clock[CLOCK_DDR]     = clock[CLOCK_SYSREF] / ((r2 & 0x3F) + 1) * 8 * // See NOTE above...
 	                 (((r2 >> 6) & 0x3FF) + 1) / clock_mss_divisor(r2, 16);
 	clock[CLOCK_PCLK0]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  2);
 	clock[CLOCK_PCLK1]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  5);
