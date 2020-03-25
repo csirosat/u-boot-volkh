@@ -125,10 +125,10 @@
 #endif
 
 #define CONFIG_MEM_RAM_BASE		0x20000000
-#define CONFIG_MEM_RAM_LEN		(16 * 1024)
+#define CONFIG_MEM_RAM_LEN		(28 * 1024)
 #define CONFIG_MEM_RAM_BUF_LEN		(32 * 1024)
-#define CONFIG_MEM_MALLOC_LEN		(12 * 1024)
-#define CONFIG_MEM_STACK_LEN		(4 * 1024)
+#define CONFIG_MEM_MALLOC_LEN		( 0 * 1024)
+#define CONFIG_MEM_STACK_LEN		( 4 * 1024)
 
 /*
  * malloc() pool size
