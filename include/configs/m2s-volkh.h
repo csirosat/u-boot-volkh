@@ -181,9 +181,9 @@
  * U-boot environment configuration
  */
 #define CONFIG_ENV_IS_IN_SPI_FLASH	1
-#define CONFIG_ENV_SECT_SIZE		0x1000
+#define CONFIG_ENV_SECT_SIZE		0x10000
 #define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
-#define CONFIG_ENV_OFFSET		0x0
+#define CONFIG_ENV_OFFSET		0x10000
 #define CONFIG_ENV_SPI_BUS		CONFIG_SPI_FLASH_BUS
 #define CONFIG_ENV_SPI_CS		CONFIG_SPI_FLASH_CS
 #define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SPI_FLASH_SPEED
@@ -197,7 +197,7 @@
  * Linux MTD driver has no boot sectors support, so locate kernel
  * with 64K alignment
  */
-#define CONFIG_ENV_IMG_OFFSET		0x10000
+#define CONFIG_ENV_IMG_OFFSET		0x800000
 
 /*
  * Serial console configuration: MSS UART1
@@ -297,7 +297,7 @@
 /*
  * Max number of command args
  */
-#define CONFIG_SYS_MAXARGS		16
+#define CONFIG_SYS_MAXARGS		32
 
 /*
  * Auto-boot sequence configuration
