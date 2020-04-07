@@ -100,8 +100,9 @@ struct m2s_coresf2config {
  */
 enum clock {
 	CLOCK_SYSREF,
-	CLOCK_SYSTICK,
 	CLOCK_DDR,
+	CLOCK_A,
+	CLOCK_SYSTICK,
 	CLOCK_PCLK0,
 	CLOCK_PCLK1,
 	CLOCK_FIC0,

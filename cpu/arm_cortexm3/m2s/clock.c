@@ -66,29 +66,30 @@ static void clock_mss_init(void)
  * Calculate the divisor for a specified FACC1 field
  * @param r		FACC1 value
  * @param s		FACC1 divisor field
+ * @param q		1 = FACC_PLL_DIVQ usage ; 0 = normal FACC1 usage
  * @returns		divisor
  */
-static unsigned int clock_mss_divisor(unsigned int r, unsigned int s)
+static unsigned int clock_mss_divisor(unsigned int r, unsigned int s, unsigned int q)
 {
 	unsigned int v, ret;
 
 	/*
  	 * Get a 3-bit field that defines the divisor
  	 */
-	v = (r & (0x7<<s)) >> s;
+	v = (r >> s) & 0x7;
 
 	/*
 	 * Translate the bit representation of the divisor to 
 	 * a value ready to be used in calculation of a clock.
 	 */
 	switch (v) {
-	case 0: ret = 1; break;
-	case 1: ret = 2; break;
-	case 2: ret = 4; break;
-	case 4: ret = 8; break;
-	case 5: ret = 16; break;
-	case 6: ret = 32; break;
-	default: ret = 1; break;
+		case 0: ret = 1; break;
+		case 1: ret = 2; break;
+		case 2: ret = 4; break;
+		case 3: ret = (q ?  8 :  4); break;
+		case 4: ret = (q ? 16 :  8); break;
+		case 5: ret = (q ? 32 : 16); break;
+		default: ret = 32; break;
 	}
 
 	return ret;
@@ -101,40 +102,46 @@ static void clock_mss_learn(void)
 {
 	unsigned int r1 = M2S_SYSREG->mssddr_facc1_cr;
 	unsigned int r2 = M2S_SYSREG->mssddr_pll_status_low_cr;
+	unsigned int r3 = M2S_SYSREG->mssddr_pll_status_high_cr;
 
 	/*
 	 * System reference clock is defined as a build-time constant.
 	 * This clock comes from the FPGA PLL and we can't determine
 	 * its value at run time. All clocks derived from CLK_BASE
 	 * can be calculated at run time (and we do just that).
-	 *
-	 * NOTE: CLOCK_DDR calculation requires a mysterious factor of 8
-	 * unaccounted for in all presently known registers.  Suspected to
-	 * be internal to the MPLL, and quite possibly opaque to the user.
-	 * Furthermore, the factor of 8 is not required in all clock configs.
-	 * Trying to get more information out of Microsemi on this, however
-	 * currently looking to be a long-shot.  So this remains a hack for now.
 	 */
-	clock[CLOCK_SYSREF] = CONFIG_SYS_M2S_SYSREF;
 
 	/*
-	 * Respectively:
-	 * M3_CLK_DIVISOR
-	 * FACC_PLL_DIVR & FACC_PLL_DIVF & FACC_PLL_DIVQ
-	 * APB0_DIVISOR
-	 * APB1_DIVISOR
-	 * FIC_0_DIVISOR
-	 * FIC_1_DIVISOR
-	 * DDR_FIC_DIVISOR
+	 * MPLL diagram...
+	 *
+	 *                +------+       +----------+
+	 * CLK_BASE ----> | DIVR | ----> | REF      |
+	 *                +------+       |          |        +------+
+	 *                               | PLL  OUT | --+--> | DIVQ | --+--> CLK_DDR
+	 *                +------+       |          |   |    +------+   |
+	 *          +---> | DIVF | ----> | FB       |   |               |
+	 *          |     +------+       +----------+   |               |
+	 *          |               /|                  |               |
+	 *          |              /1| <----------------+               |
+	 *          +------------ |  | PLL_FSE               +-----+    |
+	 *                         \0| <-------------------- | / 2 | <--+
+	 *                          \|                       +-----+
 	 */
-	clock[CLOCK_SYSTICK] = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  9);
-	clock[CLOCK_DDR]     = clock[CLOCK_SYSREF] / ((r2 & 0x3F) + 1) * 8 * // See NOTE above...
-	                 (((r2 >> 6) & 0x3FF) + 1) / clock_mss_divisor(r2, 16);
-	clock[CLOCK_PCLK0]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  2);
-	clock[CLOCK_PCLK1]   = clock[CLOCK_SYSREF] / clock_mss_divisor(r1,  5);
-	clock[CLOCK_FIC0]    = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 13);
-	clock[CLOCK_FIC1]    = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 16);
-	clock[CLOCK_DDRFIC]  = clock[CLOCK_SYSREF] / clock_mss_divisor(r1, 19);
+
+	clock[CLOCK_SYSREF]  = CONFIG_SYS_M2S_SYSREF;                         // CLK_BASE
+	clock[CLOCK_DDR]     = clock[CLOCK_SYSREF]                            // CLK_DDR calc
+	                     / (((r2 >> 0) & 0x03F) + 1)                      // FACC_PLL_DIVR
+	                     * (((r2 >> 6) & 0x3FF) + 1);                     // FACC_PLL_DIVF
+	if ((r3 >> 3) & 0x1)                                                  // FACC_PLL_FSE
+	        clock[CLOCK_DDR] /= clock_mss_divisor(r2, 16, 1);             // FACC_PLL_DIVQ
+	else    clock[CLOCK_DDR] *= 2;                                        // MPLL-external divide-by-2
+	clock[CLOCK_A]       = clock[CLOCK_DDR] / ((r1 & 0x3) + 1);           // DIVISOR_A
+	clock[CLOCK_SYSTICK] = clock[CLOCK_A] / clock_mss_divisor(r1,  9, 0); // M3_CLK_DIVISOR
+	clock[CLOCK_PCLK0]   = clock[CLOCK_A] / clock_mss_divisor(r1,  2, 0); // APB0_DIVISOR
+	clock[CLOCK_PCLK1]   = clock[CLOCK_A] / clock_mss_divisor(r1,  5, 0); // APB1_DIVISOR
+	clock[CLOCK_FIC0]    = clock[CLOCK_A] / clock_mss_divisor(r1, 13, 0); // FIC_0_DIVISOR
+	clock[CLOCK_FIC1]    = clock[CLOCK_A] / clock_mss_divisor(r1, 16, 0); // FIC_1_DIVISOR
+	clock[CLOCK_DDRFIC]  = clock[CLOCK_A] / clock_mss_divisor(r1, 19, 0); // DDR_FIC_DIVISOR
 }
 
 /*
