@@ -72,9 +72,11 @@
 #define CONFIG_SYS_BOARD_REV_STR	"2.1, UNSW-Canberra"
 
 /*
- * Monitor prompt
+ * Shell options
  */
 #define CONFIG_SYS_PROMPT		"M2S-VOLKH> "
+#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
+#define CONFIG_SYS_HUSH_PARSER
 
 /*
  * We want to call the CPU specific initialization
@@ -157,7 +159,7 @@
 #define CONFIG_SYS_NO_FLASH
 
 /*
- * Configure the SPI contoler device driver
+ * Configure the SPI controller device driver
  * FIFO Size is 64K, but leave 5 bytes for cmd[] + addr[]
  */
 #define CONFIG_M2S_SPI			1
@@ -270,6 +272,7 @@
 #define CONFIG_CMD_FPGA
 #define CONFIG_CMD_IMI
 #define CONFIG_CMD_ITEST
+#define CONFIG_CMD_SETEXPR
 
 // u-boot/common/cmd_bootm.c generates build errors
 #undef CONFIG_CMD_IMLS
@@ -289,10 +292,12 @@
 #define CONFIG_CMD_SF
 #endif
 
+#define CONFIG_CMD_SPI
+
 /*
  * To save memory disable long help
  */
-#undef CONFIG_SYS_LONGHELP
+#define CONFIG_SYS_LONGHELP
 
 /*
  * Max number of command args
