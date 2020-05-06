@@ -107,8 +107,11 @@
 #if defined(SPI_M2S_DEBUG)
 # define d_printk(level, fmt, args...)					\
 	if (spi_m2s_debug >= level) printf("%s: " fmt, __func__, ## args)
+# define d_printf(level, fmt, args...)					\
+	if (spi_m2s_debug >= level) printf(fmt, ## args)
 #else
 # define d_printk(level, fmt, args...)
+# define d_printf(level, fmt, args...)
 #endif
 
 /*
@@ -194,21 +197,29 @@ static inline struct m2s_spi_slave *to_m2s_spi(struct spi_slave *slave)
  */
 static void pdma_dump(char *comment, u8 drx, u8 dtx)
 {
-	printf("DMA %s. status=0x%08x\n", comment, MSS_PDMA->status);
-	printf(" rx %d. status=0x%08x\n", drx, MSS_PDMA->chan[drx].status);
+	// try to pre-read the volatile registers before calling slow printfs
+	volatile unsigned int rxa_cnt = MSS_PDMA->chan[drx].buf[0].cnt;
+	volatile unsigned int txa_cnt = MSS_PDMA->chan[dtx].buf[0].cnt;
+	volatile unsigned int rxb_cnt = MSS_PDMA->chan[drx].buf[1].cnt;
+	volatile unsigned int txb_cnt = MSS_PDMA->chan[dtx].buf[1].cnt;
+	volatile unsigned int rx_stat = MSS_PDMA->chan[drx].status;
+	volatile unsigned int tx_stat = MSS_PDMA->chan[dtx].status;
+
+	printf("DMA %s: status=0x%08x\n", comment, MSS_PDMA->status);
+	printf(" rx %d: status=0x%08x\n", drx, rx_stat);
 	printf("  A: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[drx].buf[0].src, MSS_PDMA->chan[drx].buf[0].dst,
-		MSS_PDMA->chan[drx].buf[0].cnt);
+		rxa_cnt);
 	printf("  B: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[drx].buf[1].src, MSS_PDMA->chan[drx].buf[1].dst,
-		MSS_PDMA->chan[drx].buf[1].cnt);
-	printf(" tx %d. status=0x%08x\n", dtx, MSS_PDMA->chan[dtx].status);
+		rxb_cnt);
+	printf(" tx %d: status=0x%08x\n", dtx, tx_stat);
 	printf("  A: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[dtx].buf[0].src, MSS_PDMA->chan[dtx].buf[0].dst,
-		MSS_PDMA->chan[dtx].buf[0].cnt);
+		txa_cnt);
 	printf("  B: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[dtx].buf[1].src, MSS_PDMA->chan[dtx].buf[1].dst,
-		MSS_PDMA->chan[dtx].buf[1].cnt);
+		txb_cnt);
 }
 #endif
 
@@ -598,10 +609,11 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 	static int xfer_ttl;
 	static u8 dummy;
 
-	int i, btx, brx, ret = 0;
+	int i, j, btx, brx, ret = 0;
 	void *p;
 	struct m2s_spi_slave *s = to_m2s_spi(slv);
 	volatile struct mss_pdma_chan *chan;
+	char xfer_len_str[8];
 
 	/*
 	 * If this is a first transfer in a transaction, reset
@@ -670,6 +682,10 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 			p = xfer_arr[i].din;
 			chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
 			chan->control |= PDMA_CONTROL_DST_ADDR_INC_1;
+//			// initialise array with counting pattern for debug
+//			for (j = 0; j < xfer_arr[i].len; j++) {
+//				((unsigned char *)xfer_arr[i].din)[j] = j;
+//			}
 		} else {
 			p = &dummy;
 			chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
@@ -683,7 +699,7 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 		 */
 		chan = &MSS_PDMA->chan[s->dtx];
 		btx = !!(chan->status & PDMA_STATUS_BUF_SEL);
-		chan->control |= brx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
+		chan->control |= btx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
 		if (xfer_arr[i].dout) {
 			p = (void *)xfer_arr[i].dout;
 			chan->control &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
@@ -696,11 +712,19 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 		chan->buf[btx].src = (u32)p;
 		chan->buf[btx].dst = (u32)&MSS_SPI(s)->tx_data;
 
+#if defined(SPI_M2S_DEBUG)
+		sprintf(xfer_len_str, "xfer %i", i);
+#endif
+
 		/*
 		 * Start RX, and TX
 		 */
 		MSS_PDMA->chan[s->drx].buf[brx].cnt = xfer_arr[i].len;
 		MSS_PDMA->chan[s->dtx].buf[btx].cnt = xfer_arr[i].len;
+
+#if defined(SPI_M2S_DEBUG)
+		pdma_dump(xfer_len_str, s->drx, s->dtx);
+#endif
 
 		/*
 		 * Wait for transaction completes (basing on RX status)
@@ -709,17 +733,34 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 	}
 
 #if defined(SPI_M2S_DEBUG)
-	pdma_dump("xfer done", s->drx, s->dtx);
 	for (i = 0; i <= xfer_len; i++) {
-		d_printk(4, "%d:%x,%x\n", i,
-			xfer_arr[i].dout ?
-				((unsigned char *) xfer_arr[i].dout)[0] : -1,
-			xfer_arr[i].din ?
-				((unsigned char *) xfer_arr[i].din)[0] : -1);
+		d_printk(4, "[%d] tx:", i);
+		for (j = 0; j < (xfer_arr[i].len > 16 ? 16 : xfer_arr[i].len); j++) {
+			if (j)
+				d_printf(4, "-");
+			if (xfer_arr[i].dout) {
+				d_printf(4, "%02x", ((unsigned char *)xfer_arr[i].dout)[j]);
+			} else {
+				d_printf(4, "XX");
+			}
+		}
+		if (xfer_arr[i].len > 16) d_printf(4, "...");
+		d_printf(4, " rx:");
+		for (j = 0; j < (xfer_arr[i].len > 16 ? 16 : xfer_arr[i].len); j++) {
+			if (j)
+				d_printf(4, "-");
+			if (xfer_arr[i].din) {
+				d_printf(4, "%02x", ((unsigned char *)xfer_arr[i].din)[j]);
+			} else {
+				d_printf(4, "XX");
+			}
+		}
+		if (xfer_arr[i].len > 16) d_printf(4, "...");
+		d_printf(4, "\n");
 	}
 #endif
 done:
-	d_printk(3, "slv=%p,bl=%d,fl=0x%lx\n", slv, bl,fl);
+	d_printk(3, "slv=%p,bl=%d,fl=0x%lx\n", slv, bl, fl);
 	return ret;
 }
 

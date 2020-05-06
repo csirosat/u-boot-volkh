@@ -204,7 +204,8 @@ void default_isr(void)
 static void __attribute__((used)) dump_ctx(unsigned int *ctx)
 {
 	static char *regs[] = {
-		"R0", "R1", "R2", "R3", "R12", "LR", "PC", "PSR"
+		"R0   ", "R1   ", "R2   ", "R3   ",
+		"R12  ", "LR   ", "PC   ", "PSR  "
 	};
 	static char *exc[] = {
 		0,
@@ -223,7 +224,7 @@ static void __attribute__((used)) dump_ctx(unsigned int *ctx)
 		"RESERVED",
 		"PENDSV",
 		"SYSTICK",
-};
+	};
 	unsigned char vec = cortex_m3_irq_vec_get();
 	int i;
 
@@ -234,9 +235,23 @@ static void __attribute__((used)) dump_ctx(unsigned int *ctx)
 		printf("INTISR[%d]\n", vec - 16);
 	}
 	for (i = 0; i < 8; i++) {
-		printf("  %s\t= %08x", regs[i], ctx[i]);
+		printf("  %s = %08x", regs[i], ctx[i]);
 		if (((i + 1) % 2) == 0) {
 			printf("\n");
 		}
 	}
+	printf( "  HFSR  = %08x\n",
+			*((unsigned int   *)(0xE000ED2C)));
+	printf( "  CFSR  = %08x\n",
+			*((unsigned int   *)(0xE000ED28)));
+	printf( "  MMFSR =       %02x"
+		"  MMFAR = %08x\n",
+			*((unsigned char  *)(0xE000ED28)),
+			*((unsigned int   *)(0xE000ED34)));
+	printf( "  BFSR  =     %02x  "
+		"  BFAR  = %08x\n",
+			*((unsigned char  *)(0xE000ED29)),
+			*((unsigned int   *)(0xE000ED38)));
+	printf( "  UFSR  = %04x\n",
+			*((unsigned short *)(0xE000ED2A)));
 }

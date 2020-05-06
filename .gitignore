@@ -6,6 +6,9 @@
 # Normal rules
 #
 
+.settings
+.cproject
+.project
 *.rej
 *.orig
 *.a
