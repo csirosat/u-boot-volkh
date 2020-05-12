@@ -44,6 +44,7 @@
  * Disable debug messages
  */
 #undef DEBUG
+#undef CONFIG_SYS_M2S_SPI_DEBUG
 
 /*
  * This is an ARM Cortex-M3 CPU core

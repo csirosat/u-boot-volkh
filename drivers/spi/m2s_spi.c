@@ -25,6 +25,8 @@
 #include <malloc.h>
 #include <clock.h>
 
+#undef NO_PDMA
+
 /*
  * Debug output control. While debugging, have SPI_M2S_DEBUG defined.
  * In deployment, make sure that SPI_M2S_DEBUG is undefined
@@ -64,6 +66,8 @@
 #define SPI_CONTROL_BIGFIFO		(1 << 29)
 #define SPI_CONTROL_CLKMODE		(1 << 28)
 #define SPI_CONTROL_RESET		(1 << 31)
+
+#define SPI_STATUS_RXFIFOEMP		(1 << 6)
 
 /*
  * PDMA register bits
@@ -206,14 +210,16 @@ static void pdma_dump(char *comment, u8 drx, u8 dtx)
 	volatile unsigned int tx_stat = MSS_PDMA->chan[dtx].status;
 
 	printf("DMA %s: status=0x%08x\n", comment, MSS_PDMA->status);
-	printf(" rx %d: status=0x%08x\n", drx, rx_stat);
+	printf(" rx %d: control=0x%08x status=0x%08x\n", drx,
+		MSS_PDMA->chan[drx].control, rx_stat);
 	printf("  A: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[drx].buf[0].src, MSS_PDMA->chan[drx].buf[0].dst,
 		rxa_cnt);
 	printf("  B: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[drx].buf[1].src, MSS_PDMA->chan[drx].buf[1].dst,
 		rxb_cnt);
-	printf(" tx %d: status=0x%08x\n", dtx, tx_stat);
+	printf(" tx %d: control=0x%08x status=0x%08x\n", dtx,
+		MSS_PDMA->chan[dtx].control, tx_stat);
 	printf("  A: src=0x%08x,dst=0x%08x,cnt=0x%08x\n",
 		MSS_PDMA->chan[dtx].buf[0].src, MSS_PDMA->chan[dtx].buf[0].dst,
 		txa_cnt);
@@ -518,27 +524,48 @@ int spi_claim_bus(struct spi_slave *slv)
 	if (!pdma_used++)
 		M2S_SYSREG->soft_reset_cr &= ~M2S_SYS_SOFT_RST_CR_PDMA;
 
+	/*
+	 * Reset the PDMA channels for RX and TX.
+	 */
 	MSS_PDMA->chan[s->drx].control = PDMA_CONTROL_RESET |
 					 PDMA_CONTROL_CLR_B |
 					 PDMA_CONTROL_CLR_A;
-	MSS_PDMA->chan[s->drx].control |= PDMA_CONTROL_WRITE_ADJ |
-					  PDMA_CONTROL_SRC_ADDR_INC_0 |
-					  PDMA_CONTROL_XFER_SIZE_1B;
-	MSS_PDMA->chan[s->drx].control |= s->drx_sel |
-					  PDMA_CONTROL_PERIPH;
-
 	MSS_PDMA->chan[s->dtx].control = PDMA_CONTROL_RESET |
 					 PDMA_CONTROL_CLR_B |
 					 PDMA_CONTROL_CLR_A;
-	MSS_PDMA->chan[s->dtx].control |= PDMA_CONTROL_WRITE_ADJ |
-					  PDMA_CONTROL_DST_ADDR_INC_0 |
-					  PDMA_CONTROL_XFER_SIZE_1B;
-	MSS_PDMA->chan[s->dtx].control |= s->dtx_sel |
-					  PDMA_CONTROL_DIR |
-					  PDMA_CONTROL_PERIPH;
+
+	/*
+	 * Take the PDMA channels out of reset.
+	*/
+	MSS_PDMA->chan[s->drx].control = 0;
+	MSS_PDMA->chan[s->dtx].control = 0;
+
+	/*
+	 * Set the PDMA channel control register fields.
+	 * DO NOT use back-to-back read-modify-writes to the control register.
+	 * With certain M3:APB clock ratios, there appears to be a delay
+	 * between when write data is committed, and when that data is
+	 * readable on a following read.  Perhaps this delay only applies
+	 * immediately after a channel reset, but this is not clear.
+	 */
+	MSS_PDMA->chan[s->drx].control = s->drx_sel |
+					 PDMA_CONTROL_WRITE_ADJ |
+					 PDMA_CONTROL_SRC_ADDR_INC_0 |
+					 PDMA_CONTROL_XFER_SIZE_1B |
+					 PDMA_CONTROL_PERIPH;
+	MSS_PDMA->chan[s->dtx].control = s->dtx_sel |
+					 PDMA_CONTROL_WRITE_ADJ |
+					 PDMA_CONTROL_DST_ADDR_INC_0 |
+					 PDMA_CONTROL_XFER_SIZE_1B |
+					 PDMA_CONTROL_DIR |
+					 PDMA_CONTROL_PERIPH;
 
 	d_printk(2, "bus=%d,soft_reset_cr=0x%x,control=0x%x\n",
 		slv->bus, M2S_SYSREG->soft_reset_cr, MSS_SPI(s)->control);
+
+	d_printk(2, "RX-chan=%d,RX-ctrl=0x%08x,TX-chan=%d,TX-ctrl=0x%08x\n",
+		s->drx, MSS_PDMA->chan[s->drx].control,
+		s->dtx, MSS_PDMA->chan[s->dtx].control);
 
 	d_printk(2, "slv=%p\n", slv);
 	return ret;
@@ -613,7 +640,13 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 	void *p;
 	struct m2s_spi_slave *s = to_m2s_spi(slv);
 	volatile struct mss_pdma_chan *chan;
+	unsigned int chan_ctrl_reg;
+#ifdef SPI_M2S_DEBUG
 	char xfer_len_str[8];
+#endif
+#ifdef NO_PDMA
+	char *tx_src_ptr, *tx_dst_ptr, *rx_src_ptr, *rx_dst_ptr;
+#endif
 
 	/*
 	 * If this is a first transfer in a transaction, reset
@@ -674,47 +707,63 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 	for (i = 0; i <= xfer_len; i++) {
 		/*
 		 * Set-up RX
+		 * DO NOT use back-to-back read-modify-writes to the control register.
+		 * See note in spi_claim_bus() for more details.
 		 */
 		chan = &MSS_PDMA->chan[s->drx];
 		brx = !!(chan->status & PDMA_STATUS_BUF_SEL);
-		chan->control |= brx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
+		chan_ctrl_reg = chan->control;
+		chan_ctrl_reg |= brx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
 		if (xfer_arr[i].din) {
 			p = xfer_arr[i].din;
-			chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
-			chan->control |= PDMA_CONTROL_DST_ADDR_INC_1;
-//			// initialise array with counting pattern for debug
-//			for (j = 0; j < xfer_arr[i].len; j++) {
-//				((unsigned char *)xfer_arr[i].din)[j] = j;
-//			}
+			chan_ctrl_reg &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
+			chan_ctrl_reg |= PDMA_CONTROL_DST_ADDR_INC_1;
 		} else {
 			p = &dummy;
-			chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
-			chan->control |= PDMA_CONTROL_DST_ADDR_INC_0;
+			chan_ctrl_reg &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
+			chan_ctrl_reg |= PDMA_CONTROL_DST_ADDR_INC_0;
 		}
+#ifndef NO_PDMA
+		chan->control      = chan_ctrl_reg;
 		chan->buf[brx].src = (u32)&MSS_SPI(s)->rx_data;
 		chan->buf[brx].dst = (u32)p;
+#else
+		rx_src_ptr = (char *)&MSS_SPI(s)->rx_data;
+		rx_dst_ptr = (char *)p;
+#endif
 
 		/*
 		 * Set-up TX
+		 * DO NOT use back-to-back read-modify-writes to the control register.
+		 * See note in spi_claim_bus() for more details.
 		 */
 		chan = &MSS_PDMA->chan[s->dtx];
 		btx = !!(chan->status & PDMA_STATUS_BUF_SEL);
-		chan->control |= btx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
+		chan_ctrl_reg = chan->control;
+		chan_ctrl_reg |= btx ? PDMA_CONTROL_CLR_B : PDMA_CONTROL_CLR_A;
 		if (xfer_arr[i].dout) {
 			p = (void *)xfer_arr[i].dout;
-			chan->control &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
-			chan->control |= PDMA_CONTROL_SRC_ADDR_INC_1;
+			chan_ctrl_reg &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
+			chan_ctrl_reg |= PDMA_CONTROL_SRC_ADDR_INC_1;
 		} else {
 			p = &dummy;
-			chan->control &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
-			chan->control |= PDMA_CONTROL_SRC_ADDR_INC_0;
+			chan_ctrl_reg &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
+			chan_ctrl_reg |= PDMA_CONTROL_SRC_ADDR_INC_0;
 		}
+#ifndef NO_PDMA
+		chan->control      = chan_ctrl_reg;
 		chan->buf[btx].src = (u32)p;
 		chan->buf[btx].dst = (u32)&MSS_SPI(s)->tx_data;
-
-#if defined(SPI_M2S_DEBUG)
-		sprintf(xfer_len_str, "xfer %i", i);
+#else
+		tx_src_ptr = (char *)p;
+		tx_dst_ptr = (char *)&MSS_SPI(s)->tx_data;
 #endif
+
+#ifndef NO_PDMA
+
+#	if defined(SPI_M2S_DEBUG)
+		sprintf(xfer_len_str, "xfer %i", i);
+#	endif
 
 		/*
 		 * Start RX, and TX
@@ -722,14 +771,36 @@ int spi_xfer(struct spi_slave *slv, unsigned int bl,
 		MSS_PDMA->chan[s->drx].buf[brx].cnt = xfer_arr[i].len;
 		MSS_PDMA->chan[s->dtx].buf[btx].cnt = xfer_arr[i].len;
 
-#if defined(SPI_M2S_DEBUG)
+#	if defined(SPI_M2S_DEBUG)
 		pdma_dump(xfer_len_str, s->drx, s->dtx);
-#endif
+#	endif
 
 		/*
 		 * Wait for transaction completes (basing on RX status)
 		 */
 		while (!(MSS_PDMA->chan[s->drx].status & (1 << brx)));
+
+#else // NO_PDMA defined
+
+		/*
+		 * Programmed-I/O "memcpy" one byte at a time.
+		 * First send the TX byte, then wait for and retrieve the RX byte.
+		 */
+		for (j = 0; j < xfer_arr[i].len; j++) {
+			if (xfer_arr[i].dout)
+				*tx_dst_ptr = *tx_src_ptr++;
+			else
+				*tx_dst_ptr = *tx_src_ptr;
+
+			while (MSS_SPI(s)->status & SPI_STATUS_RXFIFOEMP);
+
+			if (xfer_arr[i].din)
+				*rx_dst_ptr++ = *rx_src_ptr;
+			else
+				*rx_dst_ptr   = *rx_src_ptr;
+		}
+
+#endif // !NO_PDMA?
 	}
 
 #if defined(SPI_M2S_DEBUG)
