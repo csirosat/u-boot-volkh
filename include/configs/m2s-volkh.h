@@ -200,7 +200,10 @@
  * Linux MTD driver has no boot sectors support, so locate kernel
  * with 64K alignment
  */
-#define CONFIG_ENV_IMG_OFFSET		0x800000
+#define CONFIG_ENV_LINUX_BACKUP_OFFSET	0x0020000
+#define CONFIG_ENV_LINUX_NORMAL_OFFSET	0x0800000
+#define CONFIG_ENV_FPGA_GOLDEN_OFFSET	0x1000000
+#define CONFIG_ENV_FPGA_UPDATE_OFFSET	0x1400000
 
 /*
  * Serial console configuration: MSS UART1
@@ -286,14 +289,16 @@
 #define CONFIG_CMD_SOURCE
 #define CONFIG_CMD_XIMG
 
-// u-boot/cpu/arm_cortexm3/cmd_somtest.c does not exist
-#undef CONFIG_CMD_SOMTEST
-
 #if defined(CONFIG_SPI_FLASH)
 #define CONFIG_CMD_SF
 #endif
 
 #define CONFIG_CMD_SPI
+
+#define CONFIG_MD5
+#define CONFIG_CMD_MD5SUM
+
+#define CONFIG_CMD_M2S_MSS
 
 /*
  * To save memory disable long help
@@ -327,27 +332,28 @@
 /*
  * Short-cuts to some useful commands (macros)
  */
-#define CONFIG_EXTRA_ENV_SETTINGS				\
-	"loadaddr=" MK_STR(UIMAGE_LOADADDR) "\0"		\
-	"args=setenv bootargs " CONFIG_BOOTARGS "\0"		\
-	"ethaddr=C0:B1:3C:83:83:83\0"				\
-	"ipaddr=172.17.4.219\0"					\
-	"serverip=172.17.0.1\0"					\
-	"image=networking.uImage\0"				\
-	"spiaddr=" MK_STR(CONFIG_ENV_IMG_OFFSET) "\0"		\
-	"spisize=400000\0"					\
-	"spiprobe=sf probe " MK_STR(CONFIG_SPI_FLASH_BUS) "\0"	\
-	"addip=setenv bootargs ${bootargs}"			\
-	" ip=${ipaddr}:${serverip}:${gatewayip}:"		\
-	"${netmask}:${hostname}:eth0:off\0"			\
-	"flashboot=run args addip;run spiprobe;"		\
-	" sf read ${loadaddr} ${spiaddr} ${spisize};"		\
-	" bootm ${loadaddr}\0"					\
+#define CONFIG_EXTRA_ENV_SETTINGS					\
+	"loadaddr=" MK_STR(UIMAGE_LOADADDR) "\0"			\
+	"args=setenv bootargs " CONFIG_BOOTARGS "\0"			\
+	"ethaddr=C0:B1:3C:83:83:83\0"					\
+	"ipaddr=172.17.4.219\0"						\
+	"serverip=172.17.0.1\0"						\
+	"image=networking.uImage\0"					\
+	"spiaddr=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"		\
+	"spisize=400000\0"						\
+	"spiprobe=sf probe " MK_STR(CONFIG_SPI_FLASH_BUS) "\0"		\
+	"addip=setenv bootargs ${bootargs}"				\
+	" ip=${ipaddr}:${serverip}:${gatewayip}:"			\
+	"${netmask}:${hostname}:eth0:off\0"				\
+	"flashboot=run args addip;run spiprobe;"			\
+	" sf read ${loadaddr} ${spiaddr} ${spisize};"			\
+	" bootm ${loadaddr}\0"						\
 	"netboot=tftp ${loadaddr} ${image};run args addip;bootm\0"	\
-	"update=tftp ${loadaddr} ${image};run spiprobe;"	\
-	" sf erase ${spiaddr} ${filesize};"			\
-	" sf write ${loadaddr} ${spiaddr} ${filesize};"		\
-	" setenv spisize 0x${filesize}; saveenv\0"
+	"update=tftp ${loadaddr} ${image};run spiprobe;"		\
+	" sf erase ${spiaddr} ${filesize};"				\
+	" sf write ${loadaddr} ${spiaddr} ${filesize};"			\
+	" setenv spisize 0x${filesize}; saveenv\0"			\
+	"iapaddr=" MK_STR(CONFIG_ENV_FPGA_UPDATE_OFFSET) "\0"
 
 /*
  * Linux kernel boot parameters configuration

@@ -29,7 +29,9 @@ include $(TOPDIR)/config.mk
 
 LIB	= $(obj)lib$(SOC).a
 
-COBJS-$(CONFIG_CMD_SOMTEST) += cmd_somtest.o
+COBJS-$(CONFIG_CMD_M2S_MSS) += mss_sys_services.o
+COBJS-$(CONFIG_CMD_M2S_MSS) += mss_comblk.o
+COBJS-$(CONFIG_CMD_M2S_MSS) += cmd_mss.o
 COBJS-$(CONFIG_CMD_M2S_SPI_TEST) += cmd_spitest.o
 COBJS-$(CONFIG_ARMCORTEXM3_SOC_INIT) += soc.o
 COBJS	:= clock.o cpu.o envm.o wdt.o $(COBJS-y)

@@ -61,6 +61,11 @@ extern void start_armboot(void);
 extern void lpc18xx_norflash_bootstrap_iomux_init(void);
 #endif
 
+#ifdef CONFIG_CMD_M2S_MSS
+#define ComBlk_IRQn	19
+extern void ComBlk_IRQHandler(void);
+#endif
+
 /*
  * Control IRQs
  */
@@ -93,7 +98,14 @@ unsigned int vectors[] __attribute__((section(".vectors"))) = {
 	/*
 	 * Other exceptions
 	 */
-	[2 ... 165]	= (unsigned int)&default_isr
+	[2 ... 165]	= (unsigned int)&default_isr,
+
+#ifdef CONFIG_CMD_M2S_MSS
+	/*
+	 * COMBLK IRQ19
+	 */
+	[16 + ComBlk_IRQn] = (unsigned int)&ComBlk_IRQHandler
+#endif
 };
 
 #ifdef CONFIG_LPC18XX_NORFLASH_BOOTSTRAP_WORKAROUND
