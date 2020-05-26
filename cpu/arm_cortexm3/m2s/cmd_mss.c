@@ -26,6 +26,7 @@
 /*
  *  Microsemi Smartfusion2 MSS System Services driver commands
  */
+
 #include <common.h>
 #include <command.h>
 #include <stdint.h>
@@ -43,21 +44,27 @@
 #define argv_printf(fmt,args...) printf("%s %s: " fmt, argv[0], argv[1], ##args)
 
 /* Local defines */
+
 #define MSS_SUCCESS	0
 #define MSS_FAILURE	1
 
 #define SF_CMD_READ_ID	0x9f
 
 /* Local enums */
+
 enum mss_op_enum {
 	MSS_OP_NONE,
 	MSS_OP_INVALID,
+	MSS_OP_GETSER,
 	MSS_OP_GETUSR,
 	MSS_OP_GETVER,
 	MSS_OP_IAPAUTH,
 	MSS_OP_IAPPROG,
 	MSS_OP_IAPVERI,
 };
+
+/* Globals */
+static int g_mss_sys_init_called = 0;
 
 /* Local string lookup tables */
 
@@ -119,48 +126,123 @@ static void mss_usage (cmd_tbl_t * cmdtp)
 	cmd_usage(cmdtp);
 }
 
-static int mss_get_usercode (cmd_tbl_t * cmdtp)
+static void mss_async_event_handler (uint8_t event_opcode, uint8_t response)
+{
+	dbg_printf("Async event received: event_opcode=%d(0x%02x), response=%d(0x%02x)\n",
+			event_opcode, event_opcode, response, response);
+}
+
+static int mss_get_serial (cmd_tbl_t * cmdtp, int argc, char *argv[])
 {
 	int status;
-	uint8_t uc[4];
+	union u_serial {
+		uint32_t u32[4];
+		uint8_t  u8[16];
+	} serial;
+	char serial_str[2 + (16*2) + 1]; // "0x" "00112233445566778899AABBCCDDEEFF" "\0"
 
 	dbg_printf("will get FPGA design user-code\n");
 
-	MSS_SYS_init(NULL);
+	if (!g_mss_sys_init_called) {
+		g_mss_sys_init_called = 1;
+		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
+		dbg_printf("MSS_SYS_init succeeded\n");
+		__enable_irq();
+	}
 
-	dbg_printf("MSS_SYS_init succeeded\n");
+	status = MSS_SYS_get_serial_number(serial.u8);
 
-	__enable_irq();
+//	__disable_irq();
 
-	status = MSS_SYS_get_user_code(uc);
+	sprintf(serial_str, "0x%08x%08x%08x%08x",
+		serial.u32[3], serial.u32[2], serial.u32[1], serial.u32[0]);
 
-	__disable_irq();
+	printf("MSS_SYS_get_serial_number: status=%d, serial-num=%s\n",
+		status, serial_str);
 
-	dbg_printf("MSS_SYS_get_user_code: status=%d, user-code=0x%08x(\"%c%c%c%c\")\n",
-			status, *(unsigned int *)uc, uc[3], uc[2], uc[1], uc[0]);
+	/*
+	 * If user has supplied a variable-name argument,
+	 * store the user-code in that variable.
+	 */
+	if (argc > 2) {
+		setenv(argv[2], serial_str);
+	}
 
 	return status;
 }
 
-static int mss_get_version (cmd_tbl_t * cmdtp)
+static int mss_get_usercode (cmd_tbl_t * cmdtp, int argc, char *argv[])
 {
 	int status;
-	uint8_t version[2];
+	union u_ucode {
+		uint32_t u32;
+		uint8_t  u8[4];
+	} ucode;
+	char ucode_str[2 + (4*2) + 1]; // "0x" "12345678" "\0"
+
+	dbg_printf("will get FPGA design user-code\n");
+
+	if (!g_mss_sys_init_called) {
+		g_mss_sys_init_called = 1;
+		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
+		dbg_printf("MSS_SYS_init succeeded\n");
+		__enable_irq();
+	}
+
+	status = MSS_SYS_get_user_code(ucode.u8);
+
+//	__disable_irq();
+
+	sprintf(ucode_str, "0x%08x", ucode.u32);
+
+	printf("MSS_SYS_get_user_code: status=%d, user-code=%s(\"%c%c%c%c\")\n",
+		status, ucode_str, ucode.u8[3], ucode.u8[2], ucode.u8[1], ucode.u8[0]);
+
+	/*
+	 * If user has supplied a variable-name argument,
+	 * store the user-code in that variable.
+	 */
+	if (argc > 2) {
+		setenv(argv[2], ucode_str);
+	}
+
+	return status;
+}
+
+static int mss_get_version (cmd_tbl_t * cmdtp, int argc, char *argv[])
+{
+	int status;
+	union u_version {
+		uint16_t u16;
+		uint8_t  u8[2];
+	} version;
+	char ver_str[5 + 1]; // "65535" "\0"
 
 	dbg_printf("will get FPGA design version\n");
 
-	MSS_SYS_init(NULL);
+	if (!g_mss_sys_init_called) {
+		g_mss_sys_init_called = 1;
+		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
+		dbg_printf("MSS_SYS_init succeeded\n");
+		__enable_irq();
+	}
 
-	dbg_printf("MSS_SYS_init succeeded\n");
+	status = MSS_SYS_get_design_version(version.u8);
 
-	__enable_irq();
+//	__disable_irq();
 
-	status = MSS_SYS_get_design_version(version);
+	sprintf(ver_str, "%u", version.u16);
 
-	__disable_irq();
+	printf("MSS_SYS_get_design_version: status=%d, fpga-version=%s\n",
+			status, ver_str);
 
-	dbg_printf("MSS_SYS_get_design_version: status=%d, version=%hd\n",
-			status, *(short *)version);
+	/*
+	 * If user has supplied a variable-name argument,
+	 * store the version number in that variable.
+	 */
+	if (argc > 2) {
+		setenv(argv[2], ver_str);
+	}
 
 	return status;
 }
@@ -217,7 +299,8 @@ static int mss_iap_cmd (cmd_tbl_t * cmdtp, int argc, char *argv[], int iap_cmd)
 	/*
 	 * Read the ID codes, mainly to finish initialization, and as a test.
 	 */
-	status = spi_xfer(slave, 8 * 6, idcode, idcode, SPI_XFER_BEGIN | SPI_XFER_END);
+	status = spi_xfer(slave, 8 * sizeof(idcode), idcode, idcode,
+			SPI_XFER_BEGIN | SPI_XFER_END);
 	if (status) {
 		argv_printf("Failed to read flash ID: %d\n", status);
 		goto cleanup_bus;
@@ -226,15 +309,16 @@ static int mss_iap_cmd (cmd_tbl_t * cmdtp, int argc, char *argv[], int iap_cmd)
 	dbg_printf("Got idcode %02x %02x %02x %02x %02x\n",
 			idcode[1], idcode[2], idcode[3], idcode[4], idcode[5]);
 
-	MSS_SYS_init(NULL);
-
-	dbg_printf("MSS_SYS_init succeeded\n");
-
-	__enable_irq();
+	if (!g_mss_sys_init_called) {
+		g_mss_sys_init_called = 1;
+		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
+		dbg_printf("MSS_SYS_init succeeded\n");
+		__enable_irq();
+	}
 
 	status = MSS_SYS_initiate_iap(iap_cmd, iap_addr);
 
-	__disable_irq();
+//	__disable_irq();
 
 	dbg_printf("MSS_SYS_initiate_iap: status=%d\n", status);
 
@@ -283,7 +367,9 @@ static int mss_decode_op (char *opstr)
 {
 	int op;
 
-	if (!strcmp ("getusr", opstr))
+	if (!strcmp ("getser", opstr))
+		op = MSS_OP_GETSER;
+	else if (!strcmp ("getusr", opstr))
 		op = MSS_OP_GETUSR;
 	else if (!strcmp ("getver", opstr))
 		op = MSS_OP_GETVER;
@@ -301,14 +387,15 @@ static int mss_decode_op (char *opstr)
 
 /* ------------------------------------------------------------------------- */
 /* Command form:
- *   mss <op> <arg>
+ *   mss <op> [arg]
  * Where <op> is one of...
- *   'getusr' : Get design user-code. No <arg> required.
- *   'getver' : Get design version. No <arg> required.
- *   'iapauth': IAP authenticate FPGA image. <arg> = offset in SPI flash.
- *   'iapprog': IAP program FPGA image. <arg> = offset in SPI flash.
- *   'iapveri': IAP verify FPGA image. <arg> = offset in SPI flash.
- *              If <arg> is omitted, 'iapaddr' environment variable is used.
+ *   'getser' : Get FPGA serial number. [arg] = variable to store serial num.
+ *   'getusr' : Get FPGA design user-code. [arg] = variable to store user-code.
+ *   'getver' : Get FPGA design version. [arg] = variable to store version num.
+ *   'iapauth': IAP Authenticate FPGA image. [arg] = offset in SPI flash.
+ *   'iapprog': IAP Program FPGA image. [arg] = offset in SPI flash.
+ *   'iapveri': IAP Verify FPGA image. [arg] = offset in SPI flash.
+ *              If [arg] omitted, 'iapaddr' environment variable is used.
  */
 int do_mss (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[])
 {
@@ -325,12 +412,16 @@ int do_mss (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[])
 		mss_usage(cmdtp);
 		break;
 
+	case MSS_OP_GETSER:
+		rc = mss_get_serial(cmdtp, argc, argv);
+		break;
+
 	case MSS_OP_GETUSR:
-		rc = mss_get_usercode(cmdtp);
+		rc = mss_get_usercode(cmdtp, argc, argv);
 		break;
 
 	case MSS_OP_GETVER:
-		rc = mss_get_version(cmdtp);
+		rc = mss_get_version(cmdtp, argc, argv);
 		break;
 
 	case MSS_OP_IAPAUTH:
@@ -355,12 +446,13 @@ int do_mss (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[])
 
 U_BOOT_CMD (mss, 3, 1, do_mss,
 	    "M2S MSS System Services support",
-	    "[operation] <arguments>\n"
+	    "<operation> [argument]\n"
 	    "  operations:\n"
-	    "    getusr  :\tGet FPGA design user-code\n"
-	    "    getver  :\tGet FPGA design version\n"
-	    "    iapauth :\tIAP Authentication of image at SPI flash offset <arg>\n"
-	    "    iapprog :\tIAP Programming of image at SPI flash offset <arg>\n"
-	    "    iapveri :\tIAP Verification of image at SPI flash offset <arg>\n"
-	    "             \tIf <arg> is omitted, 'iapaddr' environment variable is used.\n"
+	    "    getser  :\tGet FPGA serial number. [arg] = env-var to store serial num.\n"
+	    "    getusr  :\tGet FPGA design user-code. [arg] = env-var to store user-code.\n"
+	    "    getver  :\tGet FPGA design version. [arg] = env-var to store version num.\n"
+	    "    iapauth :\tIAP Authenticate image. [arg] = offset in SPI flash.\n"
+	    "    iapprog :\tIAP Program image. [arg] = offset in SPI flash.\n"
+	    "    iapveri :\tIAP Verify image. [arg] = offset in SPI flash.\n"
+	    "             \tIf [arg] omitted, 'iapaddr' environment variable is used.\n"
 );
