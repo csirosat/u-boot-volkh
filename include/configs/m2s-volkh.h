@@ -45,6 +45,7 @@
  */
 #undef DEBUG
 #undef CONFIG_SYS_M2S_SPI_DEBUG
+#undef CONFIG_SYS_M2S_MSS_DEBUG
 
 /*
  * This is an ARM Cortex-M3 CPU core
@@ -128,8 +129,8 @@
 #endif
 
 #define CONFIG_MEM_RAM_BASE		0x20000000
-#define CONFIG_MEM_RAM_LEN		(28 * 1024)
-#define CONFIG_MEM_RAM_BUF_LEN		(32 * 1024)
+#define CONFIG_MEM_RAM_LEN		(32 * 1024)
+#define CONFIG_MEM_RAM_BUF_LEN		( 0 * 1024)
 #define CONFIG_MEM_MALLOC_LEN		( 0 * 1024)
 #define CONFIG_MEM_STACK_LEN		( 4 * 1024)
 
@@ -205,6 +206,9 @@
 #define CONFIG_ENV_FPGA_GOLDEN_OFFSET	0x1000000
 #define CONFIG_ENV_FPGA_UPDATE_OFFSET	0x1400000
 
+#define CONFIG_ENV_LINUX_BACKUP_SIZE	0x07E0000
+#define CONFIG_ENV_LINUX_NORMAL_SIZE	0x0800000
+
 /*
  * Serial console configuration: MSS UART1
  */
@@ -234,8 +238,8 @@
  */
 #define CONFIG_NET_MULTI
 #define CONFIG_M2S_ETH
-
 #define CONFIG_SYS_RX_ETH_BUFFER	2
+#define CONFIG_ETHADDR			C0:B1:3C:83:83:83
 
 /*
  * Use standard MII PHY API
@@ -243,6 +247,18 @@
 #define CONFIG_MII
 #define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
 
+/*
+ * Default static IP address configuration
+ */
+#define CONFIG_IPADDR			192.168.0.2
+#define CONFIG_SERVERIP			192.168.0.1
+#define CONFIG_GATEWAYIP		192.168.0.1
+#define CONFIG_NETMASK			255.255.255.0
+#define CONFIG_HOSTNAME			m2s-volkh
+
+/*
+ * Memtest configuration
+ */
 #define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_RAM_BASE
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_RAM_BASE + \
 					 CONFIG_SYS_RAM_SIZE - \
@@ -311,14 +327,25 @@
 #define CONFIG_SYS_MAXARGS		32
 
 /*
- * Auto-boot sequence configuration
+ * Auto-boot sequence configuration:
+ * 'bootcmd' is defined statically here in CONFIG_BOOTCOMMAND.
+ * 'bootargs' is built dynamically at runtime, and is
+ * based on a number of other environment variables,
+ * defined below in the CONFIG_EXTRA_ENV_SETTINGS.
  */
 #define CONFIG_BOOTDELAY		3
 #define CONFIG_ZERO_BOOTDELAY_CHECK
-#define CONFIG_HOSTNAME			m2s-volkh
-#define CONFIG_BOOTARGS			"m2s_platform=m2s-volkh "\
-					"console=ttyS0,115200 panic=10"
-#define CONFIG_BOOTCOMMAND		"run flashboot"
+#define CONFIG_BOOTCOMMAND		"run normalboot; run backupboot"
+
+
+/*
+ * Boot-count limit configuration.
+ * CONFIG_SYS_BOOTCOUNT_ADDR is calculated as:
+ * CONFIG_MEM_RAM_BASE + (2 * CONFIG_MEM_RAM_LEN) - CONFIG_SYS_BOOTCOUNT_SIZE
+ */
+#define CONFIG_BOOTCOUNT_LIMIT		3
+#define CONFIG_SYS_BOOTCOUNT_SIZE	8
+#define CONFIG_SYS_BOOTCOUNT_ADDR	0x2000FFF8
 
 /*
  * Macro for the "loadaddr". The most optimal load address
@@ -327,33 +354,59 @@
  * so the kernel start address would be loaded just to the right
  * place.
  */
-#define UIMAGE_LOADADDR			0xA0007FC0
+#define CONFIG_LOADADDR			0xA0007FC0
+#define CONFIG_IMAGE_NAME		horus.uImage
+#define CONFIG_PLATFORM			m2s-volkh
 
 /*
- * Short-cuts to some useful commands (macros)
+ * Build the default environment macros...
  */
 #define CONFIG_EXTRA_ENV_SETTINGS					\
-	"loadaddr=" MK_STR(UIMAGE_LOADADDR) "\0"			\
-	"args=setenv bootargs " CONFIG_BOOTARGS "\0"			\
-	"ethaddr=C0:B1:3C:83:83:83\0"					\
-	"ipaddr=172.17.4.219\0"						\
-	"serverip=172.17.0.1\0"						\
-	"image=networking.uImage\0"					\
-	"spiaddr=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"		\
-	"spisize=400000\0"						\
+	"addip=setenv bootargs ${bootargs} ip=${ipaddr}:${serverip}:"	\
+		"${gatewayip}:${netmask}:${hostname}:eth0:off\0"	\
+	"altbootcmd=run backupboot\0"					\
+	"backupaddr=" MK_STR(CONFIG_ENV_LINUX_BACKUP_OFFSET) "\0"	\
+	"backupboot=setenv spiaddr ${backupaddr}; "			\
+		"setenv spisize ${backupsize}; run flashboot; "		\
+		"echo \"Failed backup boot! Resetting...\"; reset\0"	\
+	"backupsize=" MK_STR(CONFIG_ENV_LINUX_BACKUP_SIZE) "\0"		\
+	"bootlimit=" MK_STR(CONFIG_BOOTCOUNT_LIMIT) "\0"		\
+	"bootmcmd=run getfpgainfo setargs addip; bootm\0"		\
+	"flashboot=echo \"Booting from SPI flash offset ${spiaddr}\"; "	\
+		"run spiprobe; sf read ${loadaddr} ${spiaddr} "		\
+		"${spisize}; run bootmcmd\0"				\
+	"fpgaupdate=if test -n ${updatefpga}; then setenv updatefpga; "	\
+		"saveenv; if mss iapauth; then run rstbootcnt; "	\
+		"mss iapprog; else boot; fi; fi\0"			\
+	"getbootcnt=md.l " MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) " 1\0"	\
+	"getfpgainfo=mss getusr fpgausrcode; mss getver fpgaversion\0"	\
+	"iapaddr=" MK_STR(CONFIG_ENV_FPGA_UPDATE_OFFSET) "\0"		\
+	"imagename=" MK_STR(CONFIG_IMAGE_NAME) "\0"			\
+	"imageupdate=run netload; if test ${spisize} -le ${partsize}; "	\
+		"then run spiupdate; "					\
+		"else echo \"File too large!\"; fi\0"			\
+	"netboot=run netload; run bootmcmd\0"				\
+	"netload=tftp ${loadaddr} ${imagename}; setenv spisize "	\
+		"0x${filesize}\0"					\
+	"netupdate=run updatenormal\0"					\
+	"normaladdr=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"	\
+	"normalboot=run fpgaupdate; setenv spiaddr ${normaladdr}; "	\
+		"setenv spisize ${normalsize}; run flashboot; "		\
+		"echo \"Failed normal boot!\"\0"			\
+	"normalsize=" MK_STR(CONFIG_ENV_LINUX_NORMAL_SIZE) "\0"		\
+	"platform=" MK_STR(CONFIG_PLATFORM) "\0"			\
+	"rstbootcnt=mw.l " MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) " 0\0"	\
+	"setargs=setenv bootargs m2s_platform=${platform}:${sysref} "	\
+		"m2s_fpgainfo=${fpgausrcode}:${fpgaversion} "		\
+		"console=ttyS0,${baudrate} panic=10\0"			\
 	"spiprobe=sf probe " MK_STR(CONFIG_SPI_FLASH_BUS) "\0"		\
-	"addip=setenv bootargs ${bootargs}"				\
-	" ip=${ipaddr}:${serverip}:${gatewayip}:"			\
-	"${netmask}:${hostname}:eth0:off\0"				\
-	"flashboot=run args addip;run spiprobe;"			\
-	" sf read ${loadaddr} ${spiaddr} ${spisize};"			\
-	" bootm ${loadaddr}\0"						\
-	"netboot=tftp ${loadaddr} ${image};run args addip;bootm\0"	\
-	"update=tftp ${loadaddr} ${image};run spiprobe;"		\
-	" sf erase ${spiaddr} ${filesize};"				\
-	" sf write ${loadaddr} ${spiaddr} ${filesize};"			\
-	" setenv spisize 0x${filesize}; saveenv\0"			\
-	"iapaddr=" MK_STR(CONFIG_ENV_FPGA_UPDATE_OFFSET) "\0"
+	"spiupdate=run spiprobe; sf erase ${spiaddr} ${spisize}; "	\
+		"sf write ${loadaddr} ${spiaddr} ${spisize}\0"		\
+	"sysref=" MK_STR(CONFIG_SYS_M2S_SYSREF) "\0"			\
+	"updatebackup=setenv partsize ${backupsize}; "			\
+		"setenv spiaddr ${backupaddr}; run imageupdate\0"	\
+	"updatenormal=setenv partsize ${normalsize}; "			\
+		"setenv spiaddr ${normaladdr}; run imageupdate\0"	\
 
 /*
  * Linux kernel boot parameters configuration
