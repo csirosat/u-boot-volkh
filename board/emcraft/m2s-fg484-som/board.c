@@ -91,35 +91,35 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
-    return 0;
+	return 0;
 }
 
 int init_done(void)
 {
-    /* Adapted from CMSIS/system_m2sxxx.c : SystemInit() function...
-     * --------------------------------------------------------------------------
-     * Synchronize with CoreSF2Reset controlling resets from the fabric.
-     */
+	/* Adapted from CMSIS/system_m2sxxx.c : SystemInit() function...
+	* --------------------------------------------------------------------------
+	* Synchronize with CoreSF2Reset controlling resets from the fabric.
+	*/
 
-    /*
-     * Negate FPGA_SOFTRESET to de-assert MSS_RESET_N_M2F in the fabric. We must
-     * do this here because this signal is only deasserted by the System
-     * Controller on a power-on reset. Other types of reset such as a watchdog
-     * reset would result in the FPGA fabric being held in reset and getting
-     * stuck waiting for the CoreSF2Config INIT_DONE to become asserted.
-     */
-    M2S_SYSREG->soft_reset_cr &= ~SYSREG_FPGA_SOFTRESET_MASK;
+	/*
+	* Negate FPGA_SOFTRESET to de-assert MSS_RESET_N_M2F in the fabric. We must
+	* do this here because this signal is only deasserted by the System
+	* Controller on a power-on reset. Other types of reset such as a watchdog
+	* reset would result in the FPGA fabric being held in reset and getting
+	* stuck waiting for the CoreSF2Config INIT_DONE to become asserted.
+	*/
+	M2S_SYSREG->soft_reset_cr &= ~SYSREG_FPGA_SOFTRESET_MASK;
 
-    /*
-     * Signal to CoreSF2Reset that peripheral configuration registers have been
-     * written.
-     */
-    CORE_SF2_CFG->config_done |= (CONFIG_1_DONE | CONFIG_2_DONE);
+	/*
+	* Signal to CoreSF2Reset that peripheral configuration registers have been
+	* written.
+	*/
+	CORE_SF2_CFG->config_done |= (CONFIG_1_DONE | CONFIG_2_DONE);
 
-    /* Wait for INIT_DONE from CoreSF2Reset. */
-    while (!(CORE_SF2_CFG->init_done & INIT_DONE_MASK));
+	/* Wait for INIT_DONE from CoreSF2Reset. */
+	while (!(CORE_SF2_CFG->init_done & INIT_DONE_MASK));
 
-    return 0;
+	return 0;
 }
 
 int checkboard(void)

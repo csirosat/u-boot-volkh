@@ -33,9 +33,7 @@
 #include <spi.h>
 #include "mss_sys_services.h"
 
-#define	MSS_DEBUG
-
-#ifdef	MSS_DEBUG
+#ifdef	CONFIG_SYS_M2S_MSS_DEBUG
 #define	dbg_printf(fmt,args...)	printf("%s: " fmt , __FUNCTION__, ##args)
 #else
 #define dbg_printf(fmt,args...)
@@ -68,13 +66,11 @@ static int g_mss_sys_init_called = 0;
 
 /* Local string lookup tables */
 
-#ifdef MSS_DEBUG
 const char * iap_cmd_str[] = {
 	[MSS_SYS_PROG_AUTHENTICATE]	= "authentication",
 	[MSS_SYS_PROG_PROGRAM]		= "programming",
 	[MSS_SYS_PROG_VERIFY]		= "verification",
 };
-#endif
 
 const char * iap_auth_err_str[] = {
 	[MSS_SYS_CHAINING_MISMATCH             ] = "CHAINING_MISMATCH",
@@ -147,25 +143,33 @@ static int mss_get_serial (cmd_tbl_t * cmdtp, int argc, char *argv[])
 		g_mss_sys_init_called = 1;
 		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
 		dbg_printf("MSS_SYS_init succeeded\n");
-		__enable_irq();
 	}
+
+	__enable_irq();
 
 	status = MSS_SYS_get_serial_number(serial.u8);
 
-//	__disable_irq();
+#	ifndef CONFIG_SYS_M2S_MSS_DEBUG
+	__disable_irq();
+#	endif
 
-	sprintf(serial_str, "0x%08x%08x%08x%08x",
-		serial.u32[3], serial.u32[2], serial.u32[1], serial.u32[0]);
+	dbg_printf("MSS_SYS_get_serial_number: status=%d\n", status);
 
-	printf("MSS_SYS_get_serial_number: status=%d, serial-num=%s\n",
-		status, serial_str);
+	if (status == MSS_SYS_SUCCESS) {
+		sprintf(serial_str, "0x%08x%08x%08x%08x",
+			serial.u32[3], serial.u32[2], serial.u32[1], serial.u32[0]);
 
-	/*
-	 * If user has supplied a variable-name argument,
-	 * store the user-code in that variable.
-	 */
-	if (argc > 2) {
-		setenv(argv[2], serial_str);
+		/*
+		 * If user has supplied a variable-name argument,
+		 * store the user-code in that variable.
+		 */
+		if (argc > 2) {
+			setenv(argv[2], serial_str);
+		} else {
+			printf("serial-num=%s\n", serial_str);
+		}
+	} else {
+		argv_printf("Error getting serial number! status=%d\n", status);
 	}
 
 	return status;
@@ -186,24 +190,33 @@ static int mss_get_usercode (cmd_tbl_t * cmdtp, int argc, char *argv[])
 		g_mss_sys_init_called = 1;
 		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
 		dbg_printf("MSS_SYS_init succeeded\n");
-		__enable_irq();
 	}
+
+	__enable_irq();
 
 	status = MSS_SYS_get_user_code(ucode.u8);
 
-//	__disable_irq();
+#	ifndef CONFIG_SYS_M2S_MSS_DEBUG
+	__disable_irq();
+#	endif
 
-	sprintf(ucode_str, "0x%08x", ucode.u32);
+	dbg_printf("MSS_SYS_get_user_code: status=%d\n", status);
 
-	printf("MSS_SYS_get_user_code: status=%d, user-code=%s(\"%c%c%c%c\")\n",
-		status, ucode_str, ucode.u8[3], ucode.u8[2], ucode.u8[1], ucode.u8[0]);
+	if (status == MSS_SYS_SUCCESS) {
+		sprintf(ucode_str, "0x%08x", ucode.u32);
 
-	/*
-	 * If user has supplied a variable-name argument,
-	 * store the user-code in that variable.
-	 */
-	if (argc > 2) {
-		setenv(argv[2], ucode_str);
+		/*
+		 * If user has supplied a variable-name argument,
+		 * store the user-code in that variable.
+		 */
+		if (argc > 2) {
+			setenv(argv[2], ucode_str);
+		} else {
+			printf("user-code=%s(\"%c%c%c%c\")\n",
+				ucode_str, ucode.u8[3], ucode.u8[2], ucode.u8[1], ucode.u8[0]);
+		}
+	} else {
+		argv_printf("Error getting user code! status=%d\n", status);
 	}
 
 	return status;
@@ -224,24 +237,32 @@ static int mss_get_version (cmd_tbl_t * cmdtp, int argc, char *argv[])
 		g_mss_sys_init_called = 1;
 		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
 		dbg_printf("MSS_SYS_init succeeded\n");
-		__enable_irq();
 	}
+
+	__enable_irq();
 
 	status = MSS_SYS_get_design_version(version.u8);
 
-//	__disable_irq();
+#	ifndef CONFIG_SYS_M2S_MSS_DEBUG
+	__disable_irq();
+#	endif
 
-	sprintf(ver_str, "%u", version.u16);
+	dbg_printf("MSS_SYS_get_design_version: status=%d\n", status);
 
-	printf("MSS_SYS_get_design_version: status=%d, fpga-version=%s\n",
-			status, ver_str);
+	if (status == MSS_SYS_SUCCESS) {
+		sprintf(ver_str, "%u", version.u16);
 
-	/*
-	 * If user has supplied a variable-name argument,
-	 * store the version number in that variable.
-	 */
-	if (argc > 2) {
-		setenv(argv[2], ver_str);
+		/*
+		 * If user has supplied a variable-name argument,
+		 * store the version number in that variable.
+		 */
+		if (argc > 2) {
+			setenv(argv[2], ver_str);
+		} else {
+			printf("fpga-version=%s\n", ver_str);
+		}
+	} else {
+		argv_printf("Error getting design version! status=%d\n", status);
 	}
 
 	return status;
@@ -262,7 +283,7 @@ static int mss_iap_cmd (cmd_tbl_t * cmdtp, int argc, char *argv[], int iap_cmd)
 	else
 		iap_addr = CONFIG_ENV_FPGA_UPDATE_OFFSET;
 
-	dbg_printf("will start IAP %s at offset 0x%x\n", iap_cmd_str[iap_cmd], iap_addr);
+	argv_printf("Starting IAP %s at offset 0x%x...\n", iap_cmd_str[iap_cmd], iap_addr);
 
 	/*
 	 * Do almost the same thing as spi_flash_probe() in spi_flash.c,
@@ -313,12 +334,15 @@ static int mss_iap_cmd (cmd_tbl_t * cmdtp, int argc, char *argv[], int iap_cmd)
 		g_mss_sys_init_called = 1;
 		MSS_SYS_init((sys_serv_async_event_handler_t)mss_async_event_handler);
 		dbg_printf("MSS_SYS_init succeeded\n");
-		__enable_irq();
 	}
+
+	__enable_irq();
 
 	status = MSS_SYS_initiate_iap(iap_cmd, iap_addr);
 
-//	__disable_irq();
+#	ifndef CONFIG_SYS_M2S_MSS_DEBUG
+	__disable_irq();
+#	endif
 
 	dbg_printf("MSS_SYS_initiate_iap: status=%d\n", status);
 

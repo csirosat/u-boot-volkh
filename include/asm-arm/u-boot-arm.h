@@ -47,7 +47,7 @@ int	arch_misc_init(void);
 /* board/.../... */
 int	board_init(void);
 int	dram_init (void);
-int init_done (void);
+int 	init_done (void);
 void	setup_serial_tag (struct tag **params);
 void	setup_revision_tag (struct tag **params);
 
