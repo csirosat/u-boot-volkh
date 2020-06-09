@@ -336,7 +336,10 @@
 #define CONFIG_BOOTDELAY		3
 #define CONFIG_ZERO_BOOTDELAY_CHECK
 #define CONFIG_BOOTCOMMAND		"run normalboot; run backupboot"
-
+#define CONFIG_AUTOBOOT_KEYED
+#define CONFIG_AUTOBOOT_PROMPT		\
+	"Type S-T-O-P (lowercase, no dashes) to terminate autoboot in %d seconds...\n",bootdelay
+#define CONFIG_AUTOBOOT_STOP_STR	"stop"
 
 /*
  * Boot-count limit configuration.
