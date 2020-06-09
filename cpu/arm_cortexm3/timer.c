@@ -102,5 +102,15 @@ void __udelay(ulong usec)
  */
 ulong get_tbclk(void)
 {
-	return clock_get(CLOCK_SYSTICK);
+	return CONFIG_SYS_HZ;
 }
+
+/*
+ * This function is derived from PowerPC code (read timebase as long long).
+ * On ARM it just returns the timer value.
+ */
+unsigned long long get_ticks(void)
+{
+	return get_timer(0);
+}
+
