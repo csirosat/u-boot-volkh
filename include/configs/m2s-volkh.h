@@ -1,12 +1,12 @@
 /*
  * include/configs/volkh.h
  *
- * (C) Copyright 2019 CSIRO
- * Commonwealth Scientific and Industrial Research Organisation
- * Mike Pilawa <Mike.Pilawa@csiro.au>
- *
  * Configuration settings for UNSW-Canberra Volkh
  * SmartFusion2-based flight computer module.
+ *
+ * (C) Copyright 2019-2020 CSIRO
+ * Commonwealth Scientific and Industrial Research Organisation
+ * Mike Pilawa <Mike.Pilawa@csiro.au>
  *
  * Code below adapted from Emcraft SmartFusion2 M2S_FG484_SOM
  * include/configs/m2s-fg484-som.h which is...
@@ -362,26 +362,35 @@
 #define CONFIG_PLATFORM			m2s-volkh
 
 /*
+ * Macros for updating the FPGA image.
+ */
+#define CONFIG_FPGAUPDATE_ADDR		0x2000FFF4
+#define CONFIG_FPGAUPDATE_VALU		0xcda7fd9a
+
+/*
  * Build the default environment macros...
  */
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	"addip=setenv bootargs ${bootargs} ip=${ipaddr}:${serverip}:"	\
 		"${gatewayip}:${netmask}:${hostname}:eth0:off\0"	\
 	"altbootcmd=run backupboot\0"					\
-	"backupaddr=" MK_STR(CONFIG_ENV_LINUX_BACKUP_OFFSET) "\0"	\
-	"backupboot=setenv spiaddr ${backupaddr}; "			\
+	"backupboot=setenv spioffset ${backupoffset}; "			\
 		"setenv spisize ${backupsize}; run flashboot; "		\
 		"echo \"Failed backup boot! Resetting...\"; reset\0"	\
+	"backupoffset=" MK_STR(CONFIG_ENV_LINUX_BACKUP_OFFSET) "\0"	\
 	"backupsize=" MK_STR(CONFIG_ENV_LINUX_BACKUP_SIZE) "\0"		\
+	"bootcountaddr=" MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) "\0"		\
 	"bootlimit=" MK_STR(CONFIG_BOOTCOUNT_LIMIT) "\0"		\
 	"bootmcmd=run getfpgainfo setargs addip; bootm\0"		\
-	"flashboot=echo \"Booting from SPI flash offset ${spiaddr}\"; "	\
-		"run spiprobe; sf read ${loadaddr} ${spiaddr} "		\
+	"flashboot=echo \"Booting from SPI flash @ ${spioffset}\"; "	\
+		"run spiprobe; sf read ${loadaddr} ${spioffset} "	\
 		"${spisize}; run bootmcmd\0"				\
-	"fpgaupdate=if test -n ${updatefpga}; then setenv updatefpga; "	\
-		"saveenv; if mss iapauth; then run rstbootcnt; "	\
-		"mss iapprog; else boot; fi; fi\0"			\
-	"getbootcnt=md.l " MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) " 1\0"	\
+	"fpgaupdate=if itest *${fpgaupdateaddr} == ${fpgaupdatevalu}; " \
+		"then mw.l ${fpgaupdateaddr} 0; if mss iapauth; "	\
+		"then run rstbootcnt; mss iapprog; else boot; fi; fi\0"	\
+	"fpgaupdateaddr=" MK_STR(CONFIG_FPGAUPDATE_ADDR) "\0"		\
+	"fpgaupdatevalu=" MK_STR(CONFIG_FPGAUPDATE_VALU) "\0"		\
+	"getbootcnt=md.l ${bootcountaddr} 1\0"				\
 	"getfpgainfo=mss getusr fpgausrcode; mss getver fpgaversion\0"	\
 	"iapaddr=" MK_STR(CONFIG_ENV_FPGA_UPDATE_OFFSET) "\0"		\
 	"imagename=" MK_STR(CONFIG_IMAGE_NAME) "\0"			\
@@ -392,24 +401,24 @@
 	"netload=tftp ${loadaddr} ${imagename}; setenv spisize "	\
 		"0x${filesize}\0"					\
 	"netupdate=run updatenormal\0"					\
-	"normaladdr=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"	\
-	"normalboot=run fpgaupdate; setenv spiaddr ${normaladdr}; "	\
+	"normalboot=run fpgaupdate; setenv spioffset ${normaloffset}; "	\
 		"setenv spisize ${normalsize}; run flashboot; "		\
 		"echo \"Failed normal boot!\"\0"			\
+	"normaloffset=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"	\
 	"normalsize=" MK_STR(CONFIG_ENV_LINUX_NORMAL_SIZE) "\0"		\
 	"platform=" MK_STR(CONFIG_PLATFORM) "\0"			\
-	"rstbootcnt=mw.l " MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) " 0\0"	\
+	"rstbootcnt=mw.l ${bootcountaddr} 0\0"				\
 	"setargs=setenv bootargs m2s_platform=${platform}:${sysref} "	\
 		"m2s_fpgainfo=${fpgausrcode}:${fpgaversion} "		\
 		"console=ttyS0,${baudrate} panic=10\0"			\
 	"spiprobe=sf probe " MK_STR(CONFIG_SPI_FLASH_BUS) "\0"		\
-	"spiupdate=run spiprobe; sf erase ${spiaddr} ${spisize}; "	\
-		"sf write ${loadaddr} ${spiaddr} ${spisize}\0"		\
+	"spiupdate=run spiprobe; sf erase ${spioffset} ${spisize}; "	\
+		"sf write ${loadaddr} ${spioffset} ${spisize}\0"	\
 	"sysref=" MK_STR(CONFIG_SYS_M2S_SYSREF) "\0"			\
 	"updatebackup=setenv partsize ${backupsize}; "			\
-		"setenv spiaddr ${backupaddr}; run imageupdate\0"	\
+		"setenv spioffset ${backupoffset}; run imageupdate\0"	\
 	"updatenormal=setenv partsize ${normalsize}; "			\
-		"setenv spiaddr ${normaladdr}; run imageupdate\0"	\
+		"setenv spioffset ${normaloffset}; run imageupdate\0"	\
 
 /*
  * Linux kernel boot parameters configuration
