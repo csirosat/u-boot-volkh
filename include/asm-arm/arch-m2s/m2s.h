@@ -24,6 +24,8 @@
 #ifndef _MACH_M2S_H_
 #define _MACH_M2S_H_
 
+#include <linux/types.h>
+
 /*
  * SYSREG registers. Refer to Microsemi's SF2 User's Guide for details.
  */
@@ -68,7 +70,9 @@ struct m2s_sysreg {
 	unsigned int	mssddr_pll_status_high_cr;
 	unsigned int	mssddr_facc1_cr;
 	unsigned int	mssddr_facc2_cr;
-	unsigned int	reserved_A0_150[44];
+	unsigned int	reserved_A0_B0[4];
+	unsigned int	reset_source_cr;
+	unsigned int	reserved_B4_150[39];
 	unsigned int	mssddr_pll_status;
 };
 

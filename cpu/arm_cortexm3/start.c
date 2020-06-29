@@ -130,9 +130,7 @@ void
 	 * Depending on the config parameter, enable or disable the WDT.
 	 */
 #if !defined(CONFIG_HW_WATCHDOG)
-#if !defined(CONFIG_SYS_M2S)
 	wdt_disable();
-#endif
 #else
 	wdt_enable();
 #endif

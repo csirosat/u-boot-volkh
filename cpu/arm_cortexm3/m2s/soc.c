@@ -23,7 +23,6 @@
 
 #include <common.h>
 #include "soc.h"
-#include "wdt.h"
 
 #ifdef CONFIG_M2S_CACHE_ON
 /*

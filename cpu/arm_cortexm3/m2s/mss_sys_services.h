@@ -451,7 +451,7 @@
 
 #include <stdint.h>
 
-#include "../cpu/arm_cortexm3/m2s/mss_comblk_page_handler.h"
+#include "mss_comblk_page_handler.h"
 
 #ifdef __cplusplus
 extern "C" {
