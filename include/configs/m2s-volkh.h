@@ -250,9 +250,9 @@
 /*
  * Default static IP address configuration
  */
-#define CONFIG_IPADDR			192.168.0.2
-#define CONFIG_SERVERIP			192.168.0.1
-#define CONFIG_GATEWAYIP		192.168.0.1
+#define CONFIG_IPADDR			192.168.0.10
+#define CONFIG_SERVERIP			192.168.0.50
+#define CONFIG_GATEWAYIP		192.168.0.50
 #define CONFIG_NETMASK			255.255.255.0
 #define CONFIG_HOSTNAME			m2s-volkh
 
@@ -348,7 +348,7 @@
  */
 #define CONFIG_BOOTCOUNT_LIMIT		3
 #define CONFIG_SYS_BOOTCOUNT_SIZE	8
-#define CONFIG_SYS_BOOTCOUNT_ADDR	0x2000FFF8
+#define CONFIG_SYS_BOOTCOUNT_ADDR	0x300003F8
 
 /*
  * Macro for the "loadaddr". The most optimal load address
@@ -358,7 +358,8 @@
  * place.
  */
 #define CONFIG_LOADADDR			0xA0007FC0
-#define CONFIG_IMAGE_NAME		horus.uImage
+#define CONFIG_IMAGE_NAME_NORMAL	horus.uImage
+#define CONFIG_IMAGE_NAME_BACKUP	horus_safe.uImage
 #define CONFIG_PLATFORM			m2s-volkh
 
 /*
@@ -379,6 +380,7 @@
 		"echo \"Failed backup boot! Resetting...\"; reset\0"	\
 	"backupoffset=" MK_STR(CONFIG_ENV_LINUX_BACKUP_OFFSET) "\0"	\
 	"backupsize=" MK_STR(CONFIG_ENV_LINUX_BACKUP_SIZE) "\0"		\
+	"backupimage=" MK_STR(CONFIG_IMAGE_NAME_BACKUP) "\0"		\
 	"bootcountaddr=" MK_STR(CONFIG_SYS_BOOTCOUNT_ADDR) "\0"		\
 	"bootlimit=" MK_STR(CONFIG_BOOTCOUNT_LIMIT) "\0"		\
 	"bootmcmd=run getfpgainfo setargs addip; bootm\0"		\
@@ -393,7 +395,7 @@
 	"getbootcnt=md.l ${bootcountaddr} 1\0"				\
 	"getfpgainfo=mss getusr fpgausrcode; mss getver fpgaversion\0"	\
 	"iapaddr=" MK_STR(CONFIG_ENV_FPGA_UPDATE_OFFSET) "\0"		\
-	"imagename=" MK_STR(CONFIG_IMAGE_NAME) "\0"			\
+	"imagename=" MK_STR(CONFIG_IMAGE_NAME_NORMAL) "\0"		\
 	"imageupdate=run netload; if test ${spisize} -le ${partsize}; "	\
 		"then run spiupdate; "					\
 		"else echo \"File too large!\"; fi\0"			\
@@ -406,6 +408,7 @@
 		"echo \"Failed normal boot!\"\0"			\
 	"normaloffset=" MK_STR(CONFIG_ENV_LINUX_NORMAL_OFFSET) "\0"	\
 	"normalsize=" MK_STR(CONFIG_ENV_LINUX_NORMAL_SIZE) "\0"		\
+	"normalimage=" MK_STR(CONFIG_IMAGE_NAME_NORMAL) "\0"		\
 	"platform=" MK_STR(CONFIG_PLATFORM) "\0"			\
 	"rstbootcnt=mw.l ${bootcountaddr} 0\0"				\
 	"setargs=setenv bootargs m2s_platform=${platform}:${sysref} "	\
@@ -415,10 +418,12 @@
 	"spiupdate=run spiprobe; sf erase ${spioffset} ${spisize}; "	\
 		"sf write ${loadaddr} ${spioffset} ${spisize}\0"	\
 	"sysref=" MK_STR(CONFIG_SYS_M2S_SYSREF) "\0"			\
-	"updatebackup=setenv partsize ${backupsize}; "			\
-		"setenv spioffset ${backupoffset}; run imageupdate\0"	\
-	"updatenormal=setenv partsize ${normalsize}; "			\
-		"setenv spioffset ${normaloffset}; run imageupdate\0"	\
+	"updatebackup=setenv spioffset ${backupoffset}; "		\
+		"setenv partsize ${backupsize}; "			\
+		"setenv imagename ${backupimage}; run imageupdate\0"	\
+	"updatenormal=setenv spioffset ${normaloffset}; "		\
+		"setenv partsize ${normalsize}; "			\
+		"setenv imagename ${normalimage}; run imageupdate\0"	\
 
 /*
  * Linux kernel boot parameters configuration
